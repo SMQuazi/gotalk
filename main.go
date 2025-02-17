@@ -16,10 +16,6 @@ type Message struct {
 
 var usersConnectionsMap = make(UserConnectionMap)
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
-}
-
 func main() {
 	http.HandleFunc("/ws", wsHandler)
 
@@ -40,6 +36,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var upgrader = websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool { return true },
+	}
 	conn, connErr := upgrader.Upgrade(w, r, nil)
 	loginUser(user, conn)
 	if connErr != nil {
@@ -60,15 +59,20 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 func loginUser(user string, conn *websocket.Conn) {
 	fmt.Printf("User '%s' connected.\n", user)
 	usersConnectionsMap[user] = conn
-	message := Message{Users: usersConnectionsMap}
-	json, _ := json.Marshal(message)
-	for user := range usersConnectionsMap {
-		usersConnectionsMap[user].WriteMessage(websocket.TextMessage, json)
-	}
+	update()
 }
 
 func closeConnection(conn *websocket.Conn, user string) {
 	delete(usersConnectionsMap, user)
 	conn.Close()
 	fmt.Println("Client disconnected")
+	update()
+}
+
+func update() {
+	message := Message{Users: usersConnectionsMap}
+	json, _ := json.Marshal(message)
+	for user := range usersConnectionsMap {
+		usersConnectionsMap[user].WriteMessage(websocket.TextMessage, json)
+	}
 }
